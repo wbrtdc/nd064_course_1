@@ -6,12 +6,26 @@ from flask import Flask, jsonify, render_template, request, url_for, redirect, f
 from werkzeug.exceptions import abort
 
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(levelname)s:%(name)s:%(asctime)s %(message)s',
-    datefmt='%m/%d/%Y, %H:%M:%S',
-    stream=sys.stdout
+formatter = logging.Formatter(
+    '%(levelname)s:%(name)s:%(asctime)s %(message)s',
+    datefmt='%m/%d/%Y, %H:%M:%S'
 )
+
+stdout_handler = logging.StreamHandler(sys.stdout)
+stdout_handler.setLevel(logging.DEBUG)
+stdout_handler.setFormatter(formatter)
+stdout_handler.addFilter(lambda record: record.levelno < logging.WARNING)
+
+stderr_handler = logging.StreamHandler(sys.stderr)
+stderr_handler.setLevel(logging.WARNING)
+stderr_handler.setFormatter(formatter)
+
+root_logger = logging.getLogger()
+root_logger.handlers.clear()
+root_logger.setLevel(logging.DEBUG)
+root_logger.addHandler(stdout_handler)
+root_logger.addHandler(stderr_handler)
+
 logger = logging.getLogger('app')
 db_connection_count = 0
 
@@ -35,6 +49,9 @@ def get_post(post_id):
 # Define the Flask application
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your secret key'
+app.logger.handlers.clear()
+app.logger.propagate = True
+app.logger.setLevel(logging.DEBUG)
 
 # Define the main route of the web application 
 @app.route('/')
@@ -50,7 +67,7 @@ def index():
 def post(post_id):
     post = get_post(post_id)
     if post is None:
-      logger.info('Article "%s" does not exist. 404 page returned!', post_id)
+      logger.warning('Article "%s" does not exist. 404 page returned!', post_id)
       return render_template('404.html'), 404
     else:
       logger.info('Article "%s" retrieved!', post['title'])
