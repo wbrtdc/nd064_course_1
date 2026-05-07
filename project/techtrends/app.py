@@ -65,6 +65,14 @@ def about():
 
 @app.route('/healthz')
 def healthz():
+    try:
+        connection = get_db_connection()
+        connection.execute('SELECT 1 FROM posts LIMIT 1').fetchone()
+        connection.close()
+    except sqlite3.Error:
+        logger.exception('Health check failed')
+        return jsonify({'result': 'ERROR - unhealthy'}), 500
+
     return jsonify({'result': 'OK - healthy'}), 200
 
 
