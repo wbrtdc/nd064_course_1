@@ -1,13 +1,27 @@
+import logging
 import sqlite3
+import sys
 
-from flask import Flask, jsonify, json, render_template, request, url_for, redirect, flash
+from flask import Flask, jsonify, render_template, request, url_for, redirect, flash
 from werkzeug.exceptions import abort
+
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(levelname)s:%(name)s:%(asctime)s %(message)s',
+    datefmt='%m/%d/%Y, %H:%M:%S',
+    stream=sys.stdout
+)
+logger = logging.getLogger('app')
+db_connection_count = 0
 
 # Function to get a database connection.
 # This function connects to database with the name `database.db`
 def get_db_connection():
+    global db_connection_count
     connection = sqlite3.connect('database.db')
     connection.row_factory = sqlite3.Row
+    db_connection_count += 1
     return connection
 
 # Function to get a post using its ID
@@ -36,14 +50,30 @@ def index():
 def post(post_id):
     post = get_post(post_id)
     if post is None:
+      logger.info('Article "%s" does not exist. 404 page returned!', post_id)
       return render_template('404.html'), 404
     else:
+      logger.info('Article "%s" retrieved!', post['title'])
       return render_template('post.html', post=post)
 
 # Define the About Us page
 @app.route('/about')
 def about():
+    logger.info('About Us page retrieved!')
     return render_template('about.html')
+
+
+@app.route('/healthz')
+def healthz():
+    return jsonify({'result': 'OK - healthy'}), 200
+
+
+@app.route('/metrics')
+def metrics():
+    connection = get_db_connection()
+    post_count = connection.execute('SELECT COUNT(*) FROM posts').fetchone()[0]
+    connection.close()
+    return jsonify({'db_connection_count': db_connection_count, 'post_count': post_count}), 200
 
 # Define the post creation functionality 
 @app.route('/create', methods=('GET', 'POST'))
@@ -60,6 +90,7 @@ def create():
                          (title, content))
             connection.commit()
             connection.close()
+            logger.info('Article "%s" created!', title)
 
             return redirect(url_for('index'))
 
